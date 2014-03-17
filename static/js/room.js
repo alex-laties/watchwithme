@@ -1,3 +1,5 @@
+(function ($) {
+
 _xSocket = {
 	socket : "",
 	chat_window : "",
@@ -81,8 +83,11 @@ _xVideo = {
     }
 }
 
-var initSocketHandlers = function(location) {
+var init = function(location) {
+    console.log('initializing socket');
+
 	_xSocket.open(location);
+
 	$("#socket_form").on('submit', function() {
 		var input_element = $('#socket_input');
 		_xSocket.socket.send(JSON.stringify({
@@ -110,3 +115,17 @@ var initSocketHandlers = function(location) {
 
 	_xVideo.init();
 }
+
+$(document).ready(function () {
+    var roomNum = window.location.pathname.split('/')[2];
+    var location = "ws://" + window.location.host + "/room/" + roomNum + '/socket';
+    init(location);
+});
+
+window.WatchWithMe = {
+    'videoController': _xVideo,
+    'socketController': _xSocket,
+    'init': init
+}
+    
+})($);
