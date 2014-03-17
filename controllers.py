@@ -186,10 +186,14 @@ class room_socket(WebSocketHandler):
             self.log_and_publish(construct_message('JOIN', 'Welcome!', self.user))
             print self.room.host
         else:
+            is_host = self.user.email == self.room.host
             if data.get('type') == 'SET_SOURCE' and \
-               self.user.email != self.room.host:
+               not is_host:
                 print 'User tried to set source', self.user.email, self.room.host
                 return
+            if data.get('type') == 'TIMESTAMP' and \
+               not is_host:
+                return #we don't care about this user's timestamp
             self.log_and_publish(construct_message(data.get('type'), data.get('message'), self.user))
 
     def on_close(self):
@@ -237,3 +241,9 @@ def construct_wire_data(type, data, user=None, timestamp=None):
         'log' : json.dumps(log_object),
         'display' : json.dumps(display_object),
     }
+
+class pong(RequestHandler):
+    #for ping-ponging with a client (should really be inlined with the socket handler)
+    def get(self, *args, **kwargs):
+        id = self.get_argument('id', default=-1)
+        self.write(id)
