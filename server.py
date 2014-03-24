@@ -3,9 +3,7 @@
 import tornado.web
 import tornado.ioloop
 import config
-
 from urls import URLS
-from settings import settings
 
 application = tornado.web.Application(URLS, **config.APPLICATION)
 

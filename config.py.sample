@@ -1,10 +1,11 @@
-import settings
+import os.path
 
 APPLICATION = {
     'debug' : True,
     'gzip' : False,
     'cookie_secret': 'lolwut',
-    'static_path': settings.settings['static_path']
+    "static_path": os.path.join(os.path.dirname(__file__), "static"),
+    'template_path': os.path.dirname(__file__)
 }
 
 SERVER = {
@@ -16,4 +17,3 @@ REDIS = {
     'host': '127.0.0.1',
     'port': 6379,
 }
-
