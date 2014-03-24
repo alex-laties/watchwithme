@@ -99,38 +99,45 @@ class Room(object):
         else:
             return False
 
-class RoomSocketHandler(tornado.websocket.WebSocketHandler, user.AuthenticationHandler):
+class RoomSocketHandler(tornado.websocket.WebSocketHandler, user.AuthenticationHandlerMixin):
     """
     handles WS room connections
     """
 
+    def get_current_user(self):
+        return user.AuthenticationHandlerMixin.get_current_user(self)
+
     def open(self, room_id):
         print('room_id: %s' % room_id)
         self.room = Room(room_id)
-        self.user = None
+        self.user = self.get_current_user()
         self.subscription = None
 
     def on_message(self, data):
-        print 'messaged'
+
         data = json.loads(data)
         if not self.user:
             # make name
+            print "==========================***", "user is weird, making new one"
             self.user = user.make_random_user()
             self.room.join(self.user)
+
+        if not self.subscription:
             self.subscription = RedisListener(self.room, self)
             self.subscription.start()
             self.log_and_publish(construct_message('JOIN', 'Welcome!', self.user))
-            print self.room.host
-        else:
-            is_host = self.user.email == self.room.host
-            if data.get('type') == 'SET_SOURCE' and \
-               not is_host:
-                print 'User tried to set source', self.user.email, self.room.host
-                return
-            if data.get('type') == 'TIMESTAMP' and \
-               not is_host:
-                return #we don't care about this user's timestamp
-            self.log_and_publish(construct_message(data.get('type'), data.get('message'), self.user))
+
+        is_host = self.user.email == self.room.host
+
+        if data.get('type') == 'SET_SOURCE' and \
+            not is_host:
+            print 'User tried to set source', self.user.email, self.room.host
+            return
+        if data.get('type') == 'TIMESTAMP' and \
+            not is_host:
+            return #we don't care about this user's timestamp
+
+        self.log_and_publish(construct_message(data.get('type'), data.get('message'), self.user))
 
     def on_close(self):
         print("socket closed")
@@ -144,7 +151,7 @@ class RoomSocketHandler(tornado.websocket.WebSocketHandler, user.AuthenticationH
         redis.conn.rpush("room:%s:logs" % self.room.id, message.get('log'))
         redis.conn.publish("room:%s" % self.room.id, message.get('display'))
 
-class SimpleRoomHandler(user.AuthenticationHandler):
+class SimpleRoomHandler(user.AuthenticationHandlerMixin, tornado.web.RequestHandler):
     """
     handles HTTP room connections
     """
@@ -164,7 +171,6 @@ class SimpleRoomHandler(user.AuthenticationHandler):
             kwargs['is_host'] = kwargs.get('is_host', self.current_user.has_role('host'))
             kwargs['is_guest'] = kwargs.get('is_guest', self.current_user.has_role('guest'))
         super(SimpleRoomHandler, self).render(template_name, **kwargs)
-
 
 def construct_message(type, message, user=None, timestamp=None):
     return construct_wire_data(type, {'message':message}, user, timestamp)

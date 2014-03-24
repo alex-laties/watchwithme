@@ -1,6 +1,7 @@
+import tornado.web
 import watchwithme.user as user
 
-class FrontPageHandler(user.AuthenticationHandler):
+class FrontPageHandler(user.AuthenticationHandlerMixin, tornado.web.RequestHandler):
     def get(self):
         self.render("views/home.html")
 

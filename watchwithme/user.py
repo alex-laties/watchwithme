@@ -113,16 +113,17 @@ class User(object):
         else:
             return False
 
-    def auth_with_token(self, token):
+    def auth_with_token(self, token, generate_new_token=True):
         if token == self.get_from_redis("token"):
-            token = generate_salt()
-            self.set_in_redis("token", token)
+            if generate_new_token:
+                token = generate_salt()
+                self.set_in_redis("token", token)
             return token
         else:
             return False
 
     def auth_keep_token(self, token):
-        print('%s == %s' % (token, self.get_from_redis('token')))
+        #print('%s == %s' % (token, self.get_from_redis('token')))
         if token == self.get_from_redis("token"):
             return token
         else:
@@ -153,21 +154,41 @@ class User(object):
     def has_role(self, role):
         return redis.conn.sismember(self.get_hash("roles"), role)
 
-class AuthenticationHandler(tornado.web.RequestHandler):
+class AuthenticationHandlerMixin(object):
     """
-    We use an authentication handler that descends directly from Object so that we
-    can apply it to both standard request handlers and to websocket request handlers
-    using multiple inheritance.
+    By inheriting from RequestHandler, we can apply this AuthenticationHandler to both regular
+    RequestHandlers and WebsocketRequestHandlers
     """
+
+    def __init__(self, *args, **kwargs):
+        super(AuthenticationHandlerMixin, self).__init__(*args, **kwargs)
+
     def get_current_user(self):
+        """
+        has to handle cases where the secure cookie cannot be written to, ie websockets
+        """
+
+        def set_secure_cookie(key, val):
+            try:
+                self.set_secure_cookie(key, val)
+            except Exception, e:
+                print e
+
+        u = self.get_secure_cookie('user_email')
         user =  User(self.get_secure_cookie('user_email'))
-        token = user.auth_with_token(self.get_secure_cookie('user_token'))
+        t = self.get_secure_cookie('user_token')
+        print "======================>", u, t, user
+        token = user.auth_with_token(self.get_secure_cookie('user_token'), generate_new_token=False)
         if token:
-            self.set_secure_cookie('user_token', token)
+            set_secure_cookie('user_token', token)
             return user
         else:
+            print "user token is weird, making new user"
             user = make_random_user()
-            self.set_secure_cookie('user_token', user.token)
+            set_secure_cookie('user_token', user.token)
+            set_secure_cookie('user_email', user.email)
+
+            print "======================>", user.email, user.token, user
             return user
 
     def has_role(self, role):
