@@ -10,8 +10,6 @@ _xSocket = {
 			console.log("Opened socket.  Sending auth info.");
 			_xSocket.socket.send(JSON.stringify({
 				'type': 'LOGIN',
-				'user_email': _user_email,
-				'user_token': _user_token,
 			}));
 		};
 		_xSocket.socket.onmessage = _xSocket.handle_message;

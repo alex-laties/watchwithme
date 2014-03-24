@@ -1,19 +1,16 @@
+import hashlib
+import random
 import redis
-import tornado.websocket
-import threading
-import config
-from hashlib import sha1, md5
-from random import random
-
-redis.conn = redis.Redis(host=config.REDIS['host'], port=config.REDIS['port'], db=config.REDIS['db'])
+import string
+import tornado
 
 def generate_salt():
-    return sha1(str(random())).hexdigest()
+    return hashlib.sha1(str(random.random())).hexdigest()
 
 def generate_room():
-    room = md5(str(random())).hexdigest()[0:12]
+    room = hashlib.md5(str(random.random())).hexdigest()[0:12]
     while redis.conn.sismember('rooms', room):
-        room = md5(str(random())).hexdigest()[0:12]
+        room = hashlib.md5(str(random.random())).hexdigest()[0:12]
     return room
 
 def create_token():
@@ -28,101 +25,13 @@ def claim_token(token):
         return False
     return True
 
-class Room(object):
-    def __init__(self, room_id):
-        self.id = room_id
-
-    def get_users_hash(self):
-        return "room:%s:users" % self.id
-
-    def get_rooms_hash(self):
-        return "rooms"
-
-    def get_room_timecodes_hash(self):
-        return 'rooms:timecodes'
-
-    @property
-    def timecode(self):
-        return redis.conn.zscore(self.get_room_timecodes_hash(), self.id)
-
-    @timecode.setter
-    def timecode(self, value):
-        redis.conn.zadd(self.get_room_timecodes_hash(), self.id, value)
-
-    @property
-    def host(self):
-        return redis.conn.get('room:%s:host' % self.id)
-
-    @host.setter
-    def host(self, val):
-        redis.conn.set('room:%s:host' % self.id, val)
-
-    def get_video_id(self):
-        return redis.conn.get('room:%s:video_id' % self.id)
-
-    def exists(self):
-        if redis.conn.zscore(self.get_rooms_hash(), self.id):
-            return True
-        else:
-            return False
-
-    def get_size(self):
-        return redis.conn.zscore(self.get_rooms_hash(), self.id)
-
-    def create(self):
-        redis.conn.zadd(self.get_rooms_hash(), 0, self.id)
-        return self
-
-    def destroy(self):
-        redis.conn.zrem(self.get_rooms_hash(), self.id)
-        return self
-
-    def join(self, user):
-        if redis.conn.sadd(self.get_users_hash(), user.email):
-            redis.conn.zincrby(self.get_rooms_hash(), self.id, 1)
-            print user.email, self.host, type(self.host)
-            if self.host == 'None' or self.host == None:
-                print '%s is now host of room %s' % (user.email, self.id)
-                self.host = user.email
-            return True
-        else:
-            print 'join failed'
-            return False
-
-    def leave(self, user):
-        if redis.conn.srem(self.get_users_hash(), user.email):
-            redis.conn.zincrby(self.get_rooms_hash(), self.id, -1)
-            #unset host if necessary
-            if self.host == user.email:
-                self.host = None
-            #murder user
-            user.destroy()
-            return True
-        else:
-            return False
-
-
-class RedisListener(threading.Thread):
-    def __init__(self, room, socket):
-        self.room = room
-        self.socket = socket
-        self.time_to_die = threading.Event()
-        super(RedisListener, self).__init__()
-
-    def run(self):
-        self.subscription = redis.conn.pubsub()
-        self.subscription.subscribe("room:%s" % self.room.id)
-        for message in self.subscription.listen():
-            if self.time_to_die.isSet():
-                break
-            try:
-                self.socket.write_message(message['data'])
-            except:
-                print message, 'was badly formatted'
-
-
-    def stop(self):
-        self.time_to_die.set()
+def make_random_user():
+    hasher = hashlib.md5()
+    hasher.update(''.join([random.choice(string.letters) for i in range(10)]))
+    name = hasher.hexdigest()
+    user = User(name)
+    user.create('lolwut')
+    return user
 
 class User(object):
     def __init__(self, email):
@@ -195,7 +104,7 @@ class User(object):
     def salt_password(self, salt, password):
         hash_me = salt + password
         for i in range(100):
-            hash_me = sha1(hash_me).hexdigest()
+            hash_me = hashlib.sha1(hash_me).hexdigest()
         return hash_me
 
     def authenticate(self, password):
@@ -243,3 +152,23 @@ class User(object):
 
     def has_role(self, role):
         return redis.conn.sismember(self.get_hash("roles"), role)
+
+class AuthenticationHandler(tornado.web.RequestHandler):
+    """
+    We use an authentication handler that descends directly from Object so that we
+    can apply it to both standard request handlers and to websocket request handlers
+    using multiple inheritance.
+    """
+    def get_current_user(self):
+        user =  User(self.get_secure_cookie('user_email'))
+        token = user.auth_with_token(self.get_secure_cookie('user_token'))
+        if token:
+            self.set_secure_cookie('user_token', token)
+            return user
+        else:
+            user = make_random_user()
+            self.set_secure_cookie('user_token', user.token)
+            return user
+
+    def has_role(self, role):
+        return self.current_user.has_role(role)
