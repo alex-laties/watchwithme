@@ -93,8 +93,6 @@ class Room(object):
             #unset host if necessary
             if self.host == user.email:
                 self.host = None
-            #murder user
-            user.destroy()
             return True
         else:
             return False
@@ -112,6 +110,8 @@ class RoomSocketHandler(tornado.websocket.WebSocketHandler, user.AuthenticationH
         self.room = Room(room_id)
         self.user = self.get_current_user()
         self.subscription = None
+        if self.user:
+            self.room.join(self.user)
 
     def on_message(self, data):
 

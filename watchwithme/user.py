@@ -2,7 +2,6 @@ import hashlib
 import random
 import redis
 import string
-import tornado
 
 def generate_salt():
     return hashlib.sha1(str(random.random())).hexdigest()
@@ -178,9 +177,8 @@ class AuthenticationHandlerMixin(object):
         user =  User(self.get_secure_cookie('user_email'))
         t = self.get_secure_cookie('user_token')
         print "======================>", u, t, user
-        token = user.auth_with_token(self.get_secure_cookie('user_token'), generate_new_token=False)
+        token = user.auth_keep_token(self.get_secure_cookie('user_token'))
         if token:
-            set_secure_cookie('user_token', token)
             return user
         else:
             print "user token is weird, making new user"
