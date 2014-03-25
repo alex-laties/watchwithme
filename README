@@ -1,1 +1,12 @@
-WatchWithMe is a framework intended to allow groups to watch streaming video together despite geographic separation.  It is intended to be open-source, though a license has yet to be selected.  It's likely to be some variation of Apache-style license, though.
+WatchWithMe is an application dedicated to letting you watch something with your friends as quickly and as easily as possible.
+
+Anyone can host a room, chat, and watch content synchronously without an account.
+
+Features Include:
+- Text Chat
+- Video Playback Synchronization
+
+Planned Features:
+- Voice Chat
+- Persistent Accounts
+- Invite-only rooms
