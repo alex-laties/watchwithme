@@ -24,3 +24,10 @@ Installation:
 
 To Run:
 - Currently, there's no provided configs for running this project under a nice wsgi server like gunicorn or uwsgi, although setting it up would be trivial. For now, running `python server.py` should suffice.
+
+To Use:
+
+- Go to /simpleroom/<whatevernumericalid> via Chrome or Firefox, where <whatevernumericalid> is a number of your choosing. That will be your room. Share that link with anyone you want to watch stuff with.
+- To share a video, upload it to an easily downloadable location for all people you want to watch stuff with (I recommend Amazon S3), then insert the http(s) link in the input next to the `Set Source` button.
+- The video will begin to load for all members of the room. Each room member will submit to chat that they have loaded the video.
+- Click `Play` and enjoy!
