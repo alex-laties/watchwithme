@@ -63,7 +63,6 @@ var SocketManager = {
     },
 
     handleMessage : function(evt) {
-        console.log(evt.data);
         var data = JSON.parse(evt.data);
 
         if (this._messageCallbacks.hasOwnProperty(data.type)) {
@@ -88,6 +87,7 @@ var VideoManager = {
     },
 
     play : function() {
+        this.element.playbackRate = 1;
         this.element.play();
     },
 
@@ -130,20 +130,24 @@ var VideoManager = {
     handleTimestamp : function (data, ourPing) {
         console.log(data);
         //calcuate approximate host timestamp
-        var hostTimestamp = data.data.time + data.data.ping + ourPing;
+        var hostTimestamp = data.data.time + (data.data.ping / 1000) + (ourPing / 1000);
         console.log(hostTimestamp);
         //if diff is greater than 100 ms, speed up or slow down by 10%
         var diff = hostTimestamp - this.element.currentTime;
+        console.log(diff)
 
-        if (diff > 100) {
+        if (diff > .20) {
             //speed up
             console.log('speeding up');
-            this.element.playbackRate += 0.05;
+            this.element.playbackRate = 1.05;
         }
-        else if (diff < -100) {
+        else if (diff < -.20) {
             //slow down
             console.log('slowing down');
-            this.element.playbackRate -= 0.05
+            this.element.playbackRate = 0.95
+        }
+        else {
+            this.element.playbackRate = 1;
         }
     },
 
@@ -196,6 +200,7 @@ var TimeManager = {
         var lastTime = this._currentPingRequests[pingId];
         var currentTime = new Date().getTime();
         var diff = currentTime - lastTime; //assuming lastTime never > than currentTime
+        diff /= 2; //we only want 1 way, not round trip
 
         //insert into ping queue
         this.insertPingTime(diff);
@@ -228,13 +233,12 @@ var TimeManager = {
     },
 
     averagePing : function () {
-        var totalCount = this._lastFivePings.length;
-        var totalPing = 0;
-        for (var i = 0; i < this._lastFivePings.length; i++) {
-            totalPing += this._lastFivePings[i];
-        }
+        //actually reports median, since we get weird pings from time to time
+        var index = Math.floor(this._lastFivePings.length/2);
+        var clone = this._lastFivePings.slice(0); // we do not actually want to sort _lastFivePings as it's being used as a queue
+        clone.sort(function(a, b) { return a-b;});
 
-        return totalPing / totalCount;
+        return clone[index];
     },
 
     enablePing : function () {
@@ -328,7 +332,6 @@ var init = function(location) {
     //set up and start pinging
     var ping = function () {
         if (TimeManager.continuePing) {
-            console.log("sending ping");
             SocketManager.socket.send(
                 JSON.stringify(
                     TimeManager.generatePing()
@@ -352,10 +355,10 @@ var init = function(location) {
             );
 
         }
-        setTimeout(reportTimestamp, 5000);
+        setTimeout(reportTimestamp, 4333);
     };
 
-    setTimeout(reportTimestamp, 5000);
+    setTimeout(reportTimestamp, 4333);
 }
 
 $(document).ready(function () {
