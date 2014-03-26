@@ -28,6 +28,6 @@ To Run:
 To Use:
 
 - Go to /simpleroom/<whatevernumericalid> via Chrome or Firefox, where <whatevernumericalid> is a number of your choosing. That will be your room. Share that link with anyone you want to watch stuff with.
-- To share a video, upload it to an easily downloadable location for all people you want to watch stuff with (I recommend Amazon S3), then insert the http(s) link in the input next to the `Set Source` button.
+- To share an html5 compatible video, upload it to an easily downloadable location for all people you want to watch stuff with (I recommend Amazon S3), then insert the url in the input next to the `Set Source` button. For a sample video, try using this url: `https://s3.amazonaws.com/animutheater/Tears+of+Steel.mp4`
 - The video will begin to load for all members of the room. Each room member will submit to chat that they have loaded the video.
 - Click `Play` and enjoy!
