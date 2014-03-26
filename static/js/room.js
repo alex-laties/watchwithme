@@ -36,6 +36,8 @@ var ChatManager = {
 var SocketManager = {
     socket : "",
 
+    userId : null,
+
     chat_window : "",
 
     _messageCallbacks: {},
@@ -273,9 +275,18 @@ var init = function(location) {
         TimeManager.handlePong(data);
     });
 
+    SocketManager.onMessage('LOGIN', function (data) {
+        SocketManager.userId = data.data.user;
+    });
+
     SocketManager.onMessage('TIMESTAMP', function(data) {
         var i = TimeManager.averagePing();
         console.log('calculating diff ' + i);
+        // ignore if we originated the timestamp
+        if (data.user == SocketManager.userId) {
+            console.log('wait, this is our timestamp... ignoring.');
+            return;
+        }
         VideoManager.handleTimestamp(data, i);
     });
 
