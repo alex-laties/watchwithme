@@ -1,79 +1,146 @@
 (function ($) {
 
-_xSocket = {
+var ChatManager = {
+    chatWindow : null,
+    chatInput : null,
+    _submitCallback : null,
+
+    init : function (chatId, chatInputId, chatSubmitId) {
+        this.chatWindow = document.getElementById(chatId);
+        this.chatInput = document.getElementById(chatInputId);
+        var self = this;
+        $(chatSubmitId).click( function () {
+            self.clickSubmit();
+        });
+    },
+
+    displayMessage : function(user, timestamp, message) { 
+        var display_message = user + ':' + message;
+		this.chatWindow.innerHTML += '<p>'+display_message+'</p>';
+		this.chatWindow.scrollTop = SocketManager.chat_window.scrollHeight;
+	},
+
+    onSubmit : function (callee) {
+        _submitCallback = callee;
+    },
+
+    clickSubmit : function () {
+        var content = $(this.chatInput).val();
+        if (_submitCallback != null) {
+            _submitCallback(content);
+        }
+        $(this.chatInput).val("");
+    }
+}
+
+var SocketManager = {
 	socket : "",
+
 	chat_window : "",
+
+    _messageCallbacks: {},
+
+    onMessage : function(messageType, callee) {
+        this._messageCallbacks[messageType] = callee;
+    },
+
 	open : function(socket_uri) {
-		_xSocket.chat_window = document.getElementById('chat-window');
-		_xSocket.socket = new WebSocket(socket_uri);
-		_xSocket.socket.onopen = function() { 
+		this.chat_window = document.getElementById('chat-window');
+		this.socket = new WebSocket(socket_uri);
+        var self = this;
+		this.socket.onopen = function() { 
 			console.log("Opened socket.  Sending auth info.");
-			_xSocket.socket.send(JSON.stringify({
+			self.socket.send(JSON.stringify({
 				'type': 'LOGIN',
 			}));
 		};
-		_xSocket.socket.onmessage = _xSocket.handle_message;
-		_xSocket.socket.onclose = function() { console.log("Closed socket."); };
+		this.socket.onmessage = function (evt) {
+            self.handleMessage(evt);
+        };
+		this.socket.onclose = function() { console.log("Closed socket."); };
 	},
-	handle_message : function(evt) {
+
+	handleMessage : function(evt) {
 		console.log(evt.data);
 		var data = JSON.parse(evt.data);
+
+        if (this._messageCallbacks.hasOwnProperty(data.type)) {
+            this._messageCallbacks[data.type](data);
+        }
+        else {
+            console.log("No matching callback for " + data.type + "!");
+        }
+
+        /*
 		if (data.type == 'CHAT') {
-			_xSocket.show_message(data.user, 'TIMESTAMP', data.data.message);
+			SocketManager.displayMessage(data.user, 'TIMESTAMP', data.data.message);
 		}
 		else if (data.type == 'PLAY') {
-			_xVideo.start_playing();
+			VideoManager.play();
 		}
 		else if (data.type == 'PAUSE') {
-			_xVideo.pause_playing();
+			VideoManager.pause();
 		}
         else if (data.type == 'SET_SOURCE') {
-            _xVideo.set_video_source(data.data.message.source_url);
+            VideoManager.source(data.data.message.source_url);
         }
-	},
-	show_message : function(user, timestamp, message) {
-		var display_message = user + ':' + message;
-		_xSocket.chat_window.innerHTML += '<p>'+display_message+'</p>';
-		_xSocket.chat_window.scrollTop = _xSocket.chat_window.scrollHeight;
-	},
-	click_play : function() {
-		_xSocket.socket.send(JSON.stringify({
-			'type': 'PLAY',
-		}));
-	},
-	click_pause : function() {
-		_xSocket.socket.send(JSON.stringify({
-			'type': 'PAUSE',
-		}));
+        */
 	},
 }
-_xVideo = {
-	element : "",
-	init : function() {
-		_xVideo.element = document.getElementById('video-player');
-		$("#video-play").click(function(evt) {
-            _xSocket.click_play();
-			console.log('playing');
-		});
-		$("#video-pause").click(function(evt) {
-            _xSocket.click_pause();
-			console.log('pausing');
-		});
+
+var VideoManager = {
+	element : null,
+    _clickPlayCallback: null,
+    _clickPauseCallback: null,
+
+	init : function(videoElId, playId, pauseId) {
+		this.element = document.getElementById(videoElId);
+        var self = this;
+		$(playId).click(function() {self.clickPlay();});
+		$(pauseId).click(function() {self.clickPause();});
 	},
-	start_playing : function() {
-		_xVideo.element.play();
+play : function() {
+		this.element.play();
 	},
-	pause_playing : function() {
-		_xVideo.element.pause();
+
+    onClickPlay : function(callee) {
+        this._clickPlayCallback = callee;
+    },
+
+    clickPlay : function () {
+        if (this._clickPlayCallback !== null) {
+            this._clickPlayCallback();
+        }
+    },
+
+	pause : function() {
+		this.element.pause();
 	},
-    set_video_source : function (source_url) {
+
+    onClickPause : function (callee) {
+        this._clickPauseCallback = callee;
+    },
+
+    clickPause : function() {
+        if (this._clickPauseCallback) {
+            this._clickPauseCallback();
+        }
+    },
+
+    source : function (source_url) {
+        if (source_url === null) {
+            return $(this.element)
+                .find('source')
+                .attr('src');
+        }
+
         this.element.pause();
         $(this.element)
             .find('source')
             .attr('src', source_url);
         this.element.load();
         this.element.addEventListener('loadeddata', function() {
-            _xSocket.socket.send(JSON.stringify({
+            SocketManager.socket.send(JSON.stringify({
                 'type': 'CHAT',
                 'message': 'Loaded video file'
             }));
@@ -82,23 +149,50 @@ _xVideo = {
 }
 
 var init = function(location) {
-    console.log('initializing socket');
+    //init modules
+    VideoManager.init("video-player", "#video-play", "#video-pause"); //TODO fix the id diff madness
+    ChatManager.init('chat-window', 'chatText', '#chatSubmit');
 
-	_xSocket.open(location);
+    //tie modules together
+    SocketManager.onMessage('CHAT', function (data) {
+        ChatManager.displayMessage(data.user, 'TIMESTAMP', data.data.message);
+    });
 
-	$("#socket_form").on('submit', function() {
-		var input_element = $('#socket_input');
-		_xSocket.socket.send(JSON.stringify({
-			'type': 'CHAT',
-			'message': input_element.val(),
-		}));
-		input_element.val('');
-		return false;
-	});
+    SocketManager.onMessage('PLAY', function () {
+        VideoManager.play();
+    });
 
-    $("#source_url_form").on('submit', function() {
+    SocketManager.onMessage('PAUSE', function () {
+        VideoManager.pause();
+    });
+
+    SocketManager.onMessage('SET_SOURCE', function (data) {
+        console.log(VideoManager.element);
+        VideoManager.source(data.data.message.source_url);
+    });
+
+    VideoManager.onClickPlay( function () { //server signals to client to actually play
+        SocketManager.socket.send(JSON.stringify({
+            'type': 'PLAY'
+        }));
+    });
+
+    VideoManager.onClickPause( function () { //server signals to client to actually pause
+        SocketManager.socket.send(JSON.stringify({
+            'type': 'PAUSE'
+        }));
+    });
+
+    ChatManager.onSubmit( function (chatContent) {
+        SocketManager.socket.send(JSON.stringify({
+            'type': 'CHAT',
+            'message': chatContent
+        }));
+    });
+
+    $("#source_url_form").on('submit', function() { //doesn't neatly fit anywhere at the moment
         var new_source = $('#source_url_input').val();
-        _xSocket.socket.send(JSON.stringify({
+        SocketManager.socket.send(JSON.stringify({
             'type': 'SET_SOURCE',
             'message': {
                 'source_url': new_source,
@@ -107,11 +201,7 @@ var init = function(location) {
         return false;
     });
 
-	$('#close_socket').on('click', function() {
-		_xSocket.socket.close();
-	});
-
-	_xVideo.init();
+	SocketManager.open(location);
 }
 
 $(document).ready(function () {
@@ -121,8 +211,9 @@ $(document).ready(function () {
 });
 
 window.WatchWithMe = {
-    'videoController': _xVideo,
-    'socketController': _xSocket,
+    'videoController': VideoManager,
+    'socketController': SocketManager,
+    'chatController': ChatManager,
     'init': init
 }
     
