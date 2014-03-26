@@ -141,9 +141,11 @@ class RoomSocketHandler(tornado.websocket.WebSocketHandler, user.AuthenticationH
             not is_host:
             print 'User tried to set source', self.user.email, self.room.host
             return
-        if data.get('type') == 'TIMESTAMP' and \
-            not is_host:
-            return #we don't care about this user's timestamp
+        if data.get('type') == 'TIMESTAMP':
+            if not is_host:
+                return #we don't care about this user's timestamp
+            self.log_and_publish(construct_wire_data('TIMESTAMP', {'time': data.get('time'), 'ping': data.get('ping')}))
+            return
 
         self.log_and_publish(construct_message(data.get('type'), data.get('message'), self.user))
 

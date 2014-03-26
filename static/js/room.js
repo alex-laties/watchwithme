@@ -84,8 +84,13 @@ var VideoManager = {
         $(playId).click(function() {self.clickPlay();});
         $(pauseId).click(function() {self.clickPause();});
     },
+
     play : function() {
         this.element.play();
+    },
+
+    isPlaying : function () {
+        return !this.element.paused;
     },
 
     onClickPlay : function(callee) {
@@ -109,6 +114,32 @@ var VideoManager = {
     clickPause : function() {
         if (this._clickPauseCallback) {
             this._clickPauseCallback();
+        }
+    },
+
+    generateTimestamp : function () {
+        var currentTime = this.element.currentTime;
+        return {
+            'type': 'TIMESTAMP',
+            'time': currentTime
+        }
+    },
+
+    handleTimestamp : function (data, ourPing) {
+        console.log(data);
+        //calcuate approximate host timestamp
+        var hostTimestamp = data.data.time + data.data.ping + ourPing;
+        console.log(hostTimestamp);
+        //if diff is greater than 100 ms, speed up or slow down by 10%
+        var diff = hostTimestamp - this.element.currentTime;
+
+        if (diff > 100) {
+            //speed up
+            console.log('speeding up');
+        }
+        else if (diff < -100) {
+            //slow down
+            console.log('slowing down');
         }
     },
 
@@ -242,6 +273,12 @@ var init = function(location) {
         TimeManager.handlePong(data);
     });
 
+    SocketManager.onMessage('TIMESTAMP', function(data) {
+        var i = TimeManager.averagePing();
+        console.log('calculating diff ' + i);
+        VideoManager.handleTimestamp(data, i);
+    });
+
     VideoManager.onClickPlay( function () { //server signals to client to actually play
         SocketManager.socket.send(JSON.stringify({
             'type': 'PLAY'
@@ -284,12 +321,28 @@ var init = function(location) {
                     TimeManager.generatePing()
                 )
             );
-
-            setTimeout(ping, 2000);
         }
+        setTimeout(ping, 2000);
     };
 
     setTimeout(ping, 2000);
+
+    //set up and start reporting timestamp
+    var reportTimestamp = function () {
+        if (VideoManager.isPlaying()) {
+            console.log("reporting timestamp");
+            var timestamp = VideoManager.generateTimestamp();
+            //add in average ping
+            timestamp['ping'] = TimeManager.averagePing();
+            SocketManager.socket.send(
+                JSON.stringify(timestamp)
+            );
+
+        }
+        setTimeout(reportTimestamp, 5000);
+    };
+
+    setTimeout(reportTimestamp, 5000);
 }
 
 $(document).ready(function () {
