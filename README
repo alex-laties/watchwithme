@@ -10,3 +10,17 @@ Planned Features:
 - Voice Chat
 - Persistent Accounts
 - Invite-only rooms
+
+
+Requirements:
+- An available instance of Redis
+- Python 2.7
+- pip (for dependencies)
+
+Installation:
+- check out the project via `git clone https://github.com/alex-laties/watchwithme.git`
+- install dependencies via `pip install -r requirements.txt`
+- set up `config.py`. `config.py.sample` can be copied and used verbatim if lazy.
+
+To Run:
+- Currently, there's no provided configs for running this project under a nice wsgi server like gunicorn or uwsgi, although setting it up would be trivial. For now, running `python server.py` should suffice.
