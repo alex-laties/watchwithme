@@ -138,10 +138,12 @@ var VideoManager = {
         if (diff > 100) {
             //speed up
             console.log('speeding up');
+            this.element.playbackRate += 0.05;
         }
         else if (diff < -100) {
             //slow down
             console.log('slowing down');
+            this.element.playbackRate -= 0.05
         }
     },
 
