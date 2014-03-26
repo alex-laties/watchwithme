@@ -133,10 +133,93 @@ var VideoManager = {
     }
 }
 
+var TimeManager = {
+    _currentPing: null,
+    _lastFivePings: null,
+    _currentPingRequests: null, //for monitoring separate ping requests. ideally, only one is active at a time, but networking being what it is can break that assumption pretty easily
+    _pingIncrement : null,
+    element : null,
+    continuePing : null,
+
+    init : function (pingHudId) {
+        this.element = document.getElementById(pingHudId);
+        this._currentPing = 0;
+        this._lastFivePings = [];
+        this._currentPingRequests = {};
+        this._pingIncrement = 1;
+        this.continuePing = true;
+    },
+
+    handlePong : function (data) {
+        //match to a ping
+        var pingId = data.data.id;
+        if (! this._currentPingRequests.hasOwnProperty(pingId)) { //if the id doesn't exist, throw away pong
+            return;
+        }
+
+        //calculate time diff
+        var lastTime = this._currentPingRequests[pingId];
+        var currentTime = new Date().getTime();
+        var diff = currentTime - lastTime; //assuming lastTime never > than currentTime
+
+        //insert into ping queue
+        this.insertPingTime(diff);
+
+        this._currentPing = diff;
+
+        this.render();
+    },
+
+    generatePing : function () {
+        var id = this._pingIncrement;
+        var newPing = {
+            type : 'PING',
+            id : id
+        };
+
+        this._currentPingRequests[id] = new Date().getTime();
+
+        this._pingIncrement++; 
+
+        return newPing;
+    },
+
+    insertPingTime : function (time) {
+        if (this._lastFivePings.length == 5) {
+            this._lastFivePings.shift(); //kicks out head element
+        }
+
+        this._lastFivePings.push(time);
+    },
+
+    averagePing : function () {
+        var totalCount = this._lastFivePings.length;
+        var totalPing = 0;
+        for (var i = 0; i < this._lastFivePings.length; i++) {
+            totalPing += this._lastFivePings[i];
+        }
+
+        return totalPing / totalCount;
+    },
+
+    enablePing : function () {
+        this.continuePing = true;
+    },
+
+    disablePing : function () {
+        this.continuePing = false;
+    },
+
+    render : function () {
+        this.element.innerHTML = "Current Ping: " + this._currentPing + " <br /> Average Ping: " + this.averagePing();
+    }
+}
+
 var init = function(location) {
     //init modules
     VideoManager.init("video-player", "#video-play", "#video-pause"); //TODO fix the id diff madness
     ChatManager.init('chat-window', 'chatText', '#chatSubmit');
+    TimeManager.init('ping-hud');
 
     //tie modules together
     SocketManager.onMessage('CHAT', function (data) {
@@ -152,8 +235,11 @@ var init = function(location) {
     });
 
     SocketManager.onMessage('SET_SOURCE', function (data) {
-        console.log(VideoManager.element);
         VideoManager.source(data.data.message.source_url);
+    });
+
+    SocketManager.onMessage('PONG', function (data) {
+        TimeManager.handlePong(data);
     });
 
     VideoManager.onClickPlay( function () { //server signals to client to actually play
@@ -186,7 +272,24 @@ var init = function(location) {
         return false;
     });
 
+
     SocketManager.open(location);
+
+    //set up and start pinging
+    var ping = function () {
+        if (TimeManager.continuePing) {
+            console.log("sending ping");
+            SocketManager.socket.send(
+                JSON.stringify(
+                    TimeManager.generatePing()
+                )
+            );
+
+            setTimeout(ping, 2000);
+        }
+    };
+
+    setTimeout(ping, 2000);
 }
 
 $(document).ready(function () {
@@ -199,6 +302,7 @@ window.WatchWithMe = {
     'videoController': VideoManager,
     'socketController': SocketManager,
     'chatController': ChatManager,
+    'timeController' : TimeManager,
     'init': init
 }
 

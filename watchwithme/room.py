@@ -127,6 +127,14 @@ class RoomSocketHandler(tornado.websocket.WebSocketHandler, user.AuthenticationH
             self.subscription.start()
             self.log_and_publish(construct_message('JOIN', 'Welcome!', self.user))
 
+
+        #handle ping
+        if data.get('type') == 'PING':
+                self.write_message(
+                    construct_wire_data('PONG', {'id': data.get('id')}).get('display')
+                )
+                return
+
         is_host = self.user.email == self.room.host
 
         if data.get('type') == 'SET_SOURCE' and \
