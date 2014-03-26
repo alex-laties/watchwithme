@@ -16,9 +16,9 @@ var ChatManager = {
 
     displayMessage : function(user, timestamp, message) { 
         var display_message = user + ':' + message;
-		this.chatWindow.innerHTML += '<p>'+display_message+'</p>';
-		this.chatWindow.scrollTop = SocketManager.chat_window.scrollHeight;
-	},
+        this.chatWindow.innerHTML += '<p>'+display_message+'</p>';
+        this.chatWindow.scrollTop = SocketManager.chat_window.scrollHeight;
+    },
 
     onSubmit : function (callee) {
         _submitCallback = callee;
@@ -34,9 +34,9 @@ var ChatManager = {
 }
 
 var SocketManager = {
-	socket : "",
+    socket : "",
 
-	chat_window : "",
+    chat_window : "",
 
     _messageCallbacks: {},
 
@@ -44,25 +44,25 @@ var SocketManager = {
         this._messageCallbacks[messageType] = callee;
     },
 
-	open : function(socket_uri) {
-		this.chat_window = document.getElementById('chat-window');
-		this.socket = new WebSocket(socket_uri);
+    open : function(socket_uri) {
+        this.chat_window = document.getElementById('chat-window');
+        this.socket = new WebSocket(socket_uri);
         var self = this;
-		this.socket.onopen = function() { 
-			console.log("Opened socket.  Sending auth info.");
-			self.socket.send(JSON.stringify({
-				'type': 'LOGIN',
-			}));
-		};
-		this.socket.onmessage = function (evt) {
+        this.socket.onopen = function() { 
+            console.log("Opened socket.  Sending auth info.");
+            self.socket.send(JSON.stringify({
+                'type': 'LOGIN',
+            }));
+        };
+        this.socket.onmessage = function (evt) {
             self.handleMessage(evt);
         };
-		this.socket.onclose = function() { console.log("Closed socket."); };
-	},
+        this.socket.onclose = function() { console.log("Closed socket."); };
+    },
 
-	handleMessage : function(evt) {
-		console.log(evt.data);
-		var data = JSON.parse(evt.data);
+    handleMessage : function(evt) {
+        console.log(evt.data);
+        var data = JSON.parse(evt.data);
 
         if (this._messageCallbacks.hasOwnProperty(data.type)) {
             this._messageCallbacks[data.type](data);
@@ -70,38 +70,23 @@ var SocketManager = {
         else {
             console.log("No matching callback for " + data.type + "!");
         }
-
-        /*
-		if (data.type == 'CHAT') {
-			SocketManager.displayMessage(data.user, 'TIMESTAMP', data.data.message);
-		}
-		else if (data.type == 'PLAY') {
-			VideoManager.play();
-		}
-		else if (data.type == 'PAUSE') {
-			VideoManager.pause();
-		}
-        else if (data.type == 'SET_SOURCE') {
-            VideoManager.source(data.data.message.source_url);
-        }
-        */
-	},
+    },
 }
 
 var VideoManager = {
-	element : null,
+    element : null,
     _clickPlayCallback: null,
     _clickPauseCallback: null,
 
-	init : function(videoElId, playId, pauseId) {
-		this.element = document.getElementById(videoElId);
+    init : function(videoElId, playId, pauseId) {
+        this.element = document.getElementById(videoElId);
         var self = this;
-		$(playId).click(function() {self.clickPlay();});
-		$(pauseId).click(function() {self.clickPause();});
-	},
-play : function() {
-		this.element.play();
-	},
+        $(playId).click(function() {self.clickPlay();});
+        $(pauseId).click(function() {self.clickPause();});
+    },
+    play : function() {
+        this.element.play();
+    },
 
     onClickPlay : function(callee) {
         this._clickPlayCallback = callee;
@@ -113,9 +98,9 @@ play : function() {
         }
     },
 
-	pause : function() {
-		this.element.pause();
-	},
+    pause : function() {
+        this.element.pause();
+    },
 
     onClickPause : function (callee) {
         this._clickPauseCallback = callee;
@@ -201,7 +186,7 @@ var init = function(location) {
         return false;
     });
 
-	SocketManager.open(location);
+    SocketManager.open(location);
 }
 
 $(document).ready(function () {
@@ -216,5 +201,5 @@ window.WatchWithMe = {
     'chatController': ChatManager,
     'init': init
 }
-    
+
 })($);
