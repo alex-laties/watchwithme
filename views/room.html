@@ -4,6 +4,21 @@
 
 {% block scripts %}
 <script type="text/javascript" src="/static/js/room.js"></script>
+<script src="https://swww.tokbox.com/webrtc/v2.0/js/TB.min.js"></script>
+<script type="text/javascript">
+    var apiKey = "44714322";
+    var sessionId = "2_MX40NDcxNDMyMn5-U3VuIE1hciAzMCAxNDozNDowMCBQRFQgMjAxNH4wLjUxMzc4NDA1fg";
+    var token = "T1==cGFydG5lcl9pZD00NDcxNDMyMiZzZGtfdmVyc2lvbj10YnJ1YnktdGJyYi12MC45MS4yMDExLTAyLTE3JnNpZz00MDU3MGI1ZDVjNzU4NTQzMzBhZDY3NWY1N2M0ZDdjMjYwNDMzOTZkOnJvbGU9cHVibGlzaGVyJnNlc3Npb25faWQ9JmNyZWF0ZV90aW1lPTEzOTYyMTU3NTkmbm9uY2U9MC4wNzMwOTQ3OTM1Nzc1ODc5Nw==";
+
+    var session = TB.initSession(sessionId);
+    session.addEventListener('sessionConnected', sessionConnectedHandler);
+    session.connect(apiKey, token);
+
+    function sessionConnectedHandler(event) {
+        var publisher = TB.initPublisher(apiKey, 'chat-video');
+        session.publish(publisher);
+    }
+</script>
 {% end %}
 
 {% block body %}
@@ -17,6 +32,7 @@
     </div>
 </div>
 <div id="chat-container" class="container">
+    <div id="chat-video"></div>
 	<div id="chat-display">
 		<div id="chat-window" class="span10">
 		</div>
