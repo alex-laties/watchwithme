@@ -1,10 +1,9 @@
 <html>
-	<head>{% block head %}
+    <head>
+    {% block head %}
 		<title>Watch With Me - {% block title %}Home{% end %}</title>
 		<script type="text/javascript" src="/static/js/jquery-1.7.2.min.js"></script>
-                <script type="text/javascript" src="/static/js/bootstrap.min.js"></script>
-		{% block scripts %}
-		{% end %}
+		{% block scripts %}{% end %}
 		{% block css %}
 		<link rel="stylesheet" type="text/css" href="/static/css/bootstrap.min.css" />
 		<link rel="stylesheet" type="text/css" href="/static/css/watchwithme.css" />
@@ -14,7 +13,7 @@
 	<body>
 		<div class="container">
 			{% block header %}{% include "_header.html" %}{% end %}
-			{% block body %}BODY{% end %}
+			{% block body %}{% end %}
 			{% block footer %}{% include "_footer.html" %}{% end %}
 		</div>
 	</body>
