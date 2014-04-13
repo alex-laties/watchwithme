@@ -10,6 +10,7 @@
 }
 
 video {
+    margin-left: -12em;
     height: 720px;
 	width: 1280px;
 }
