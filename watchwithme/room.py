@@ -1,30 +1,9 @@
 import json
 import redis
-import threading
 import time
-import tornado, tornado.websocket
+import tornado, tornado.gen, tornado.websocket
+import tornadoredis
 import watchwithme.user as user
-
-class RedisListener(threading.Thread):
-    def __init__(self, room, socket):
-        self.room = room
-        self.socket = socket
-        self.time_to_die = threading.Event()
-        super(RedisListener, self).__init__()
-
-    def run(self):
-        self.subscription = redis.conn.pubsub()
-        self.subscription.subscribe("room:%s" % self.room.id)
-        for message in self.subscription.listen():
-            if self.time_to_die.isSet():
-                break
-            try:
-                self.socket.write_message(message['data'])
-            except:
-                print message, 'was badly formatted'
-
-    def stop(self):
-        self.time_to_die.set()
 
 class Room(object):
     def __init__(self, room_id):
@@ -38,6 +17,10 @@ class Room(object):
 
     def get_room_timecodes_hash(self):
         return 'rooms:timecodes'
+
+    @property
+    def channel_name(self):
+        return "room:%s" % self.id
 
     @property
     def timecode(self):
@@ -109,25 +92,33 @@ class RoomSocketHandler(tornado.websocket.WebSocketHandler, user.AuthenticationH
         print('room_id: %s' % room_id)
         self.room = Room(room_id)
         self.user = self.get_current_user()
-        self.subscription = None
-        if self.user:
-            self.room.join(self.user)
 
-    def on_message(self, data):
-
-        data = json.loads(data)
         if not self.user:
-            # make name
-            print "==========================***", "user is weird, making new one"
+            # make our user
             self.user = user.make_random_user()
-            self.room.join(self.user)
 
-        if not self.subscription:
-            self.subscription = RedisListener(self.room, self)
-            self.subscription.start()
-            self.log_and_publish(construct_message('JOIN', 'Welcome!', self.user))
+        self.room.join(self.user)
 
+        self.log_and_publish(construct_message('JOIN', 'Welcome!', self.user))
+        self.listen(self.room.channel_name)
 
+    @tornado.gen.engine
+    def listen(self, channel_name):
+        self.client = tornadoredis.Client()
+        self.client.connect()
+        yield tornado.gen.Task(self.client.subscribe, channel_name)
+        self.client.listen(self.on_subscription_message)
+
+    def on_subscription_message(self, message): #messages from pubsub channel
+        print message
+        if message.kind == 'message':
+            self.write_message(message.body)
+
+    def on_message(self, data): #messages from the client
+        '''
+        we do not actually return info to the user in on_message except in the case of 'PING' and 'LOGIN'
+        '''
+        data = json.loads(data)
         #handle ping
         if data.get('type') == 'PING':
                 self.write_message(
@@ -135,17 +126,20 @@ class RoomSocketHandler(tornado.websocket.WebSocketHandler, user.AuthenticationH
                 )
                 return
 
-        is_host = self.user.email == self.room.host
 
         if data.get('type') == 'LOGIN':
             self.write_message(
                 construct_wire_data('LOGIN', {'user': self.user.email}).get('display')
             )
+            return
+
+        is_host = self.user.email == self.room.host
 
         if data.get('type') == 'SET_SOURCE' and \
             not is_host:
             print 'User tried to set source', self.user.email, self.room.host
             return
+
         if data.get('type') == 'TIMESTAMP':
             if not is_host:
                 return #we don't care about this user's timestamp
@@ -156,9 +150,9 @@ class RoomSocketHandler(tornado.websocket.WebSocketHandler, user.AuthenticationH
 
     def on_close(self):
         print("socket closed")
-        if self.subscription:
-            self.subscription.stop()
-            self.log_and_publish(construct_message('LEAVE', 'Goodbye.', self.user))
+        if self.client.subscribed:
+            self.client.unsubscribe(self.room.channel_name)
+            self.client.disconnect()
         self.room.leave(self.user)
 
     def log_and_publish(self, message):
