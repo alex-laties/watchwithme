@@ -131,6 +131,7 @@ class RoomSocketHandler(tornado.websocket.WebSocketHandler, user.AuthenticationH
             self.write_message(
                 construct_wire_data('LOGIN', {'user': self.user.email}).get('display')
             )
+            self.log_and_publish(construct_wire_data('JOIN', {'user': self.user.email}))
             return
 
         is_host = self.user.email == self.room.host
@@ -144,6 +145,11 @@ class RoomSocketHandler(tornado.websocket.WebSocketHandler, user.AuthenticationH
             if not is_host:
                 return #we don't care about this user's timestamp
             self.log_and_publish(construct_wire_data('TIMESTAMP', {'time': data.get('time'), 'ping': data.get('ping')}, user=self.user))
+            return
+
+        if data.get('type') == 'JOINSYNC' and \
+            not is_host:
+            print 'User tried to joinsync', self.user.email, self.room.host
             return
 
         self.log_and_publish(construct_message(data.get('type'), data.get('message'), self.user))
