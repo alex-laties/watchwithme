@@ -64,6 +64,7 @@ var SocketManager = {
 
     handleMessage : function(evt) {
         var data = JSON.parse(evt.data);
+        console.log(data);
 
         if (this._messageCallbacks.hasOwnProperty(data.type)) {
             this._messageCallbacks[data.type](data);
@@ -128,6 +129,9 @@ var VideoManager = {
     },
 
     handleTimestamp : function (data, ourPing) {
+        if (!this.isPlaying()) {
+            this.play();
+        }
         console.log(data);
         //calcuate approximate host timestamp
         var hostTimestamp = data.data.time + (data.data.ping / 1000) + (ourPing / 1000);
@@ -152,13 +156,14 @@ var VideoManager = {
     },
 
     source : function (source_url) {
-        if (source_url === null) {
+        if (source_url === undefined) {
             return $(this.element)
                 .find('source')
                 .attr('src');
         }
 
         this.element.pause();
+        this.element.currentTime = 0;
         $(this.element)
             .find('source')
             .attr('src', source_url);
@@ -169,6 +174,7 @@ var VideoManager = {
                 'message': 'Loaded video file'
             }));
         });
+        return this.element;
     }
 }
 
@@ -294,6 +300,55 @@ var init = function(location) {
             return;
         }
         VideoManager.handleTimestamp(data, i);
+    });
+
+    SocketManager.onMessage('JOIN', function(data) {
+        if (data.user == SocketManager.userId) {
+            console.log('wait, we just joined... ignoring');
+            return;
+        }
+
+        var currSource = VideoManager.source();
+        if (currSource === '') {
+            return;
+        }
+
+        var currVideoState = VideoManager.generateTimestamp();
+        currVideoState['source'] = currSource;
+
+        var syncData = {
+            'type': 'JOINSYNC',
+            'message': currVideoState
+        };
+        SocketManager.socket.send(
+            JSON.stringify(syncData)
+        );
+    });
+
+    SocketManager.onMessage('JOINSYNC', function(data) {
+        if (VideoManager.source() != '') {
+            console.log('already playing. ignoring.');
+            return;
+        }
+         
+        var source = data.data.message.source;
+
+        if (source == undefined) {
+            console.log('bad set. ignoring');
+            return;
+        }
+
+        var time = data.data.message.time;
+
+        if (time == undefined) {
+            console.log('bad set. ignoring');
+            return;
+        }
+
+        VideoManager.source(source).addEventListener('loadedmetadata', function() {
+            this.currentTime = time;
+            VideoManager.element.removeEventListener('loadedmetadata', arguments.callee);
+        });
     });
 
     VideoManager.onClickPlay( function () { //server signals to client to actually play
